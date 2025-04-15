@@ -1,0 +1,77 @@
+%box-border {
+  border: 1px solid #eee;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-container {
+  @extend %box-border;
+
+  .toolbar {
+    background-color: white;
+    padding: 0 16px;
+    @extend %box-border;
+
+    &>* {
+      margin-right: 16px;
+    }
+  }
+
+  .request-container {
+    display: flex;
+
+    .url-list,
+    .result-container {
+      /* flex: 1; 无法解决溢出问题，宽度写死可解决 */
+      width: 50%;
+      @extend %box-border;
+    }
+
+    .url-list {
+      .list-content {
+        padding-bottom: 16px;
+      }
+
+      .url-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        font-weight: bold;
+
+        .url-text {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap
+        }
+      }
+    }
+
+    .sub-div-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      background-color: white;
+      padding: 0 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .sub-div-content {
+      background-color: white;
+      padding: 0 16px;
+    }
+
+    .result-container {
+      .result-content {
+        padding: 16px;
+      }
+    }
+  }
+}
+
+.expand-dialog-btn {
+  position: fixed; // 这条属性被去掉是因为antd为button指定了position: relative，所以我们为它指定同样的内联样式
+  z-index: 114514;
+  top: 80px;
+  right: 16px;
+}

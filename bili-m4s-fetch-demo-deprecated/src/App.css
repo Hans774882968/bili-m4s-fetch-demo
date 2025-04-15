@@ -1,0 +1,61 @@
+#root {
+  margin: 0 auto;
+  padding: 16px;
+  /* 同时适配1024px的弹窗和popup */
+  min-width: 800px;
+  width: 100%;
+}
+
+.request-container {
+  display: flex;
+  min-height: 300px;
+}
+
+.request-container .url-list,
+.request-container .result-container {
+  /* flex: 1; */
+  /* flex 1 无法解决溢出问题，宽度写死可解决 */
+  width: 50%;
+  border: 1px solid #eee;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.url-list .url-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-weight: bold;
+}
+
+.sub-div-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  background-color: white;
+  padding: 0 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.sub-div-content {
+  background-color: white;
+  padding: 0 16px;
+}
+
+.url-list .list-content {
+  padding-bottom: 16px;
+}
+
+/* TODO: 未成功实现10行 */
+.lineclamp10 {
+  display: -webkit-box;
+  -webkit-line-clamp: 10;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.result-container .result-content {
+  padding: 16px;
+}

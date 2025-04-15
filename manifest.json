@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Bili M4S Fetch Demo",
+  "version": "1.0.0",
+  "description": "Fetch and download Bilibili m4s audios and videos, with extremely user-friendly interface",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.bilibili.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "images/icon.png",
+    "default_title": "Bili M4S Fetch Demo"
+  },
+  "icons": {
+    "128": "images/icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.bilibili.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ]
+    }
+  ],
+  "homepage_url": "https://github.com/Hans774882968/bili-m4s-fetch-demo"
+}
