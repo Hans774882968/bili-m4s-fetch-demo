@@ -16,11 +16,11 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_icon": "images/icon.png",
+    "default_icon": "images/bili.png",
     "default_title": "Bili M4S Fetch Demo"
   },
   "icons": {
-    "128": "images/icon.png"
+    "128": "images/bili.png"
   },
   "content_scripts": [
     {

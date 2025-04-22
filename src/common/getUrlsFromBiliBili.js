@@ -22,6 +22,7 @@ function parseScriptTags(scriptTags) {
   return {};
 }
 
+// 在同一个url请求，会得到301，但无伤大雅
 export async function getNewPlayInfoFromHtml() {
   const resp = await fetch(window.location.href);
   const htmlStr = await resp.text();

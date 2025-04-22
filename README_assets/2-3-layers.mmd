@@ -1,0 +1,7 @@
+---
+config:
+  layout: fixed
+---
+flowchart TD
+    A("content.js") -- "chrome.runtime.sendMessage" --> B("background.js<br>chrome.runtime.onMessage.addListener")
+    B -- "chrome.storage.sync.set" --> C("popup.js<br>chrome.storage.sync.get")

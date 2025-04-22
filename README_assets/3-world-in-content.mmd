@@ -1,0 +1,5 @@
+flowchart TD
+    subgraph content.js创建弹窗
+        A(content.js) -->|renderDownloaderDialog| B(main.js)
+        B -->|"createRoot(dialog).render()"| C(App.jsx)
+    end

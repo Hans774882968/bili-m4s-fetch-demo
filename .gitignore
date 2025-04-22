@@ -23,3 +23,5 @@ dist-deprecated
 *.njsproj
 *.sln
 *.sw?
+
+bili-m4s-fetch-demo-*.zip
