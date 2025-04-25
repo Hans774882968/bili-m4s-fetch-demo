@@ -9,16 +9,13 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import { downloadM4s } from './common/request';
-import { formatFileSize } from './common/utils';
+import { formatFileSize, getM4sFileName } from './common/utils';
 import HansClamp from './clamp-js/HansClamp';
 import { getNewUrlsFromHtml } from './common/getUrlsFromBiliBili';
 import { downloadFileByALink } from './common/downloadFile';
+import Copyright from './contentSub/Copyright';
 
-const { Header, Content } = Layout;
-
-function getM4sFileName(m4sUrlDesc) {
-  return m4sUrlDesc.isAudio() ? '1.mp3' : '1.mp4';
-}
+const { Header, Content, Footer } = Layout;
 
 function getFileSizeText(fileSize) {
   const strSize = formatFileSize(fileSize);
@@ -108,7 +105,7 @@ const App = ({ initialUrls }) => {
       width={1000}
     >
       <Layout className="dialog-container">
-        <Header className="toolbar">
+        <Header className="download-helper-toolbar">
           <Button
             type="primary"
             icon={<ReloadOutlined />}
@@ -203,6 +200,10 @@ const App = ({ initialUrls }) => {
             </Content>
           </Layout>
         </Content>
+
+        <Footer className="copyright-container">
+          <Copyright />
+        </Footer>
       </Layout>
     </Modal>
   );

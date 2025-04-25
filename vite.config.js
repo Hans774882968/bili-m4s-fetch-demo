@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import copy from 'rollup-plugin-copy';
 import path from 'path';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { playInfoMockPlugin } from './src/vite-custom-plugins/playInfoMockPlugin';
 
 const destName = 'dist';
 
@@ -23,6 +25,10 @@ export default defineConfig(({ mode }) => {
         ],
         hook: 'writeBundle',
       }),
+      nodePolyfills({
+        include: ['process'],
+      }),
+      playInfoMockPlugin()
     ],
     build: {
       rollupOptions: {

@@ -1,4 +1,5 @@
 import { M4sUrlDesc } from './M4sUrlDesc';
+import { parsePlayInfoFromJSCode } from './parsePlayInfoFromJSCode';
 
 /**
  * 对话框里展示的quality就是playinfo的id
@@ -9,15 +10,8 @@ function parseScriptTags(scriptTags) {
   for (const scriptTag of scriptTags) {
     const scriptContent = scriptTag.textContent;
     if (!scriptContent || !scriptContent.includes('window.__playinfo__')) continue;
-    const startIndex = scriptContent.indexOf('{');
-    const endIndex = scriptContent.lastIndexOf('}') + 1;
-    const jsonString = scriptContent.slice(startIndex, endIndex);
-    try {
-      const playInfo = JSON.parse(jsonString);
-      return playInfo;
-    } catch (error) {
-      console.error('Error parsing playInfo JSON:', error);
-    }
+    const playInfo = parsePlayInfoFromJSCode(scriptContent);
+    return playInfo;
   }
   return {};
 }
@@ -33,15 +27,17 @@ export async function getNewPlayInfoFromHtml() {
 }
 
 export function getPlayInfoFromScriptTag() {
-  if (window.__playinfo__ && typeof window.__playinfo__ === 'object') {
-    return window.__playinfo__;
+  if (!isDev) {
+    if (window.__playinfo__ && typeof window.__playinfo__ === 'object') {
+      return window.__playinfo__;
+    }
   }
   const scriptTags = [...document.getElementsByTagName('script')];
   return parseScriptTags(scriptTags);
 }
 
 function getAudioUrlsFromPlayInfo(playInfo) {
-  const audioList = playInfo?.data?.dash?.audio;
+  const audioList = playInfo?.data?.dash?.audio || playInfo?.result?.video_info?.dash?.audio;
   if (!Array.isArray(audioList)) return [];
   const res = audioList.reduce((res, cur) => {
     const baseUrl = cur.baseUrl;
@@ -54,9 +50,18 @@ function getAudioUrlsFromPlayInfo(playInfo) {
   return res;
 }
 
+function tryToGetVIPVideoPreview(playInfo) {
+  const mp4VideoList = playInfo?.result?.video_info?.durl;
+  if (!Array.isArray(mp4VideoList)) return [];
+  return mp4VideoList.map((cur) => {
+    const m4sUrlDesc = new M4sUrlDesc(cur.url, 'unknown', M4sUrlDesc.VIDEO);
+    return m4sUrlDesc;
+  });
+}
+
 function getVideoUrlsFromPlayInfo(playInfo) {
-  const videoList = playInfo?.data?.dash?.video;
-  if (!Array.isArray(videoList)) return [];
+  const videoList = playInfo?.data?.dash?.video || playInfo?.result?.video_info?.dash?.video;
+  if (!Array.isArray(videoList)) return tryToGetVIPVideoPreview(playInfo);
   const qualitySet = new Set();
   const res = videoList.reduce((res, cur) => {
     const baseUrl = cur.baseUrl;
@@ -78,18 +83,6 @@ export function getUrlsObjFromPlayInfo(playInfo) {
 }
 
 export function getUrlsFromBiliBili() {
-  if (isDev) {
-    return [
-      new M4sUrlDesc('not a url 1', 80, M4sUrlDesc.VIDEO),
-      new M4sUrlDesc('not a url 2', 64, M4sUrlDesc.VIDEO),
-      new M4sUrlDesc('not a url 3', 32, M4sUrlDesc.VIDEO),
-      new M4sUrlDesc('not a url 4', 16, M4sUrlDesc.VIDEO),
-      new M4sUrlDesc('not a url 5', 30280, M4sUrlDesc.AUDIO),
-      new M4sUrlDesc('not a url 6', 30232, M4sUrlDesc.AUDIO),
-      new M4sUrlDesc('not a url 7', 30216, M4sUrlDesc.AUDIO),
-      new M4sUrlDesc(`this is a ${'long'.repeat(200)} url`, 114514, M4sUrlDesc.AUDIO)
-    ];
-  }
   const playInfo = getPlayInfoFromScriptTag();
   const urlsObj = getUrlsObjFromPlayInfo(playInfo);
   const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];

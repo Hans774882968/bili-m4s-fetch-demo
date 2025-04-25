@@ -4,7 +4,7 @@
 
 ## 引言
 
-Sample：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL3ZpZGVvL0JWMXBwNDIxZDc1cQ==
+Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL3ZpZGVvL0JWMXBwNDIxZDc1cQ==
 
 我去年写了这篇文章：[【前端甜点】某视频网站的m4s视频/音频下载方案（20240420）](https://www.52pojie.cn/thread-1915933-1-1.html)，但大概从去年8月开始，我发现，下载质量较高的音频时会报错`net::ERR_FAILED 206`，较低的则不报错。我百思不得其解，只能暂且猜测：
 
@@ -73,6 +73,8 @@ downloader('<m4s file url>');
 
 写完这段代码后一段时间，我刷到了[码农高天的视频](https://www.bilibili.com/video/BV18oQXYKEj3)。我想，现在LLM已经很厉害了，不妨让AI辅助我，根据这段代码，快速生成一个Chrome插件。
 
+[项目GitHub传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo)
+
 本文52pojie：https://www.52pojie.cn/thread-2026417-1-1.html
 
 本文CSDN：https://blog.csdn.net/hans774882968/article/details/147429322
@@ -94,6 +96,44 @@ https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.0
 这里只给出最重要的TODO，完整版见：其他笔记.md。
 
 > 1. 番剧页面的代码要求我们改用**Babel AST**来分析代码，而且`window.__playinfo__`的数据结构也和视频详情页不同。如下文`bangumi.js`所示。另外，限免集和会员集的数据结构也不一样。限免集是有`video_info.dash`的，仍然给你视频和音频的m4s；会员集则只有`video_info.durls`，直接给你mp4文件。
+
+## 250425更新：网站逆向分析
+
+v1.0.0的版本只考虑了视频详情页的情况，所以只解析了`window.__playinfo__`。但后来发现：
+
+1. 番剧页面的对应变量是虽然一样，但值是从另一个变量`playurlSSRData`来的。
+2. 课程视频URL没有对应的全局变量来源，只能请求接口拿。
+
+所以还是要研究一下获取视频URL的API。参考了：aHR0cHM6Ly9naXRodWIuY29tLzdyaWtrYS9iaWxpYmlsaS1hcGktZG9jcy9ibG9iL21haW4vdmlkZW8vcGxheXVybF93ZWIubWQ=
+
+视频详情页获取接口示例：
+
+- https://api.example.com/x/player/wbi/playurl?avid=637650245&bvid=BV1jY4y1q7Jj&cid=559991568&qn=80&fnver=0&fnval=4048&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=false&isGaiaAvoided=false&voice_balance=1
+
+`avid`和`bvid`不需要都给出，只需要给其中一个。
+
+番剧获取接口示例：
+
+Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL2Jhbmd1bWkvcGxheS9lcDE1MjI2MDY=
+
+- 限免：https://api.example.com/pgc/player/web/v2/playurl?qn=80&fnver=0&fnval=4048&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=true&season_id=91305&isGaiaAvoided=false&ep_id=1522604&voice_balance=1&drm_tech_type=2
+- 会员：https://api.example.com/pgc/player/web/v2/playurl?qn=80&fnver=0&fnval=4048&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=true&season_id=91305&isGaiaAvoided=false&ep_id=1522606&voice_balance=1&drm_tech_type=2
+
+由season_id和ep_id共同确定。
+
+课程视频获取接口示例：
+
+Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL2NoZWVzZS9wbGF5L2VwNzEyMDA3
+
+- https://api.example.com/pugv/player/web/playurl?avid=1354915358&cid=1556563947&qn=80&fnver=0&fnval=16&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=false&season_id=20821&isGaiaAvoided=false&ep_id=712007&voice_balance=1&drm_tech_type=2
+- https://api.example.com/pugv/player/web/playurl?avid=1655481714&cid=1572480241&qn=80&fnver=0&fnval=16&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=false&season_id=20821&isGaiaAvoided=false&ep_id=712012&voice_balance=1&drm_tech_type=2
+
+同上，由season_id和ep_id共同确定。综上：
+
+1. 虽然都有参数`session`，看上去是哈希值，但实测可去掉。这意味着可以直接请求接口了。
+2. 视频详情页主要是需要`avid/bvid`其一和`cid`，番剧和课程视频主要是需要`avid/bvid`其一、`cid, season_id, ep_id`，都可以在HTML里拿到。其他的参数暂且可以写死。
+
+所以我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，通过请求API拿视频URL。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
 
 ## 让AI写初稿
 
@@ -466,7 +506,7 @@ chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(({ request, rule }) 
 });
 ```
 
-#### 方案：解析`window.__playinfo__`
+#### v1.0.0方案：解析`window.__playinfo__`
 
 但后来我发现，该网站提供了`window.__playinfo__`，只需要解析它就行，所以我没运行代码就PASS掉了上述方案。
 
@@ -549,9 +589,63 @@ if (isDev) {
 }
 ```
 
-#### 方案升级：使用Babel AST解析代码
+#### v1.0.0方案升级：使用Babel AST解析JS代码，增加鲁棒性
 
-TODO
+上文“250425更新：网站逆向分析”提到，番剧页面的JS代码结构和视频详情页不一样，大概是这样的：
+
+```js
+const playurlSSRData = {};
+if (true) {
+  window.__playinfo__ = playurlSSRData;
+}
+```
+
+如果没有赋值语句，我v1.0.0版的代码不会有问题，但这里出现了，而且右侧并不是JSON数据，我的代码就会报错。为了处理这种情况，我第一个想到的，就是用我已经很熟悉的Babel来求变量的值。注意到这是一个常量折叠的问题，但我还没用过相关的包，所以我打算按[我之前的前端逆向项目](https://github.com/Hans774882968/control-flow-flattening-remove-public)的套路去实现。现在有了deepseek，写Babel解析AST的代码容易多了。相关Prompt：
+
+>1. 请用@babel/parser、@babel/traverse、@babel/types和@babel/generator写一个函数function parsePlayInfoFromJSCode(jsCode)，实现从以下两种情况的代码中，提取`window.__playinfo__`的值，代码保证其值符合JSON对象格式。（两种情况的代码是粘贴给LLM看的，不在此展示了）
+>2. 1、判断赋值表达式左侧的`window.__playinfo__`时，应使用early return。能使用early return减少嵌套的，都要减少嵌套。2、改成es module import。3、不需要使用eval，用JSON.parse即可。
+
+令人惊讶的是，AI生成的代码几乎没逻辑问题，只是细节不太优雅。我现在不再需要像两年前那样，时时盯着astexplorer.net，而是只用它来review一下AI代码！思路很简单，分两种情况，右侧是对象字面量，对应`isObjectExpression`，右侧是变量，对应`isIdentifier`。后一种麻烦点的情况，用`const binding = path.scope.getBinding(right.name); const init = binding.path.node.init;`即可拿到`playurlSSRData`的初值。
+
+完整代码比较长，不粘了，[传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/common/parsePlayInfoFromJSCode.js)
+
+为了测试方便，我让普通的JS对象字面量也作为输入，导致JSON.parse不足以cover。所以我又问LLM如下问题：“已知right变量是ObjectExpression。那么babel有提供相关的API，将这个ObjectExpression转为JS对象吗？”它就给我推荐了`path.evaluate()`。写法如下：
+
+```js
+const evaluated = path.get('right').evaluate();
+const evaluated = binding.path.get('init').evaluate();
+if (evaluated.confident) {
+  playInfo = evaluated.value;
+}
+```
+
+最后改造一下原有的`parseScriptTags`就OK：
+
+```js
+function parseScriptTags(scriptTags) {
+  for (const scriptTag of scriptTags) {
+    const scriptContent = scriptTag.textContent;
+    if (!scriptContent || !scriptContent.includes('window.__playinfo__')) continue;
+    const playInfo = parsePlayInfoFromJSCode(scriptContent);
+    return playInfo;
+  }
+  return {};
+}
+```
+
+### 如果在浏览器运行的代码导入了Babel相关的包，则需要polyfill
+
+上一节导入了Babel相关的包，但Babel相关的包是跑在服务端的，所以会报错：`process is not defined`。这里的`process`就是nodejs的。问AI后确定，我们需要polyfill，用`vite-plugin-node-polyfills`实现。安装：`yarn add -D vite-plugin-node-polyfills`。vite.config.js：
+
+```js
+    plugins: [
+      nodePolyfills({
+        include: ['process'],
+      }),
+    ]
+```
+
+反复调试，在这个include里不断添加，直到控制台不报错为止。
 
 ### 难点2：切换到其他视频详情页，该网站并不刷新，也不更新`window.__playinfo__`
 
@@ -587,7 +681,7 @@ export async function getNewUrlsFromHtml() {
     messageApi.success('同步完成');
   };
         // 组件：
-        <Header className="toolbar">
+        <Header className="download-helper-toolbar">
           <Button
             type="primary"
             icon={<ReloadOutlined />}
@@ -728,6 +822,73 @@ export default function HansClamp({ text, lines, className = '' }) {
               />
             </Content>
 ```
+
+### 难点5：用`transformIndexHtml`实现：开发环境下，页面每次刷新，都向index.html注入随机的JS代码，方便测试（为“难点1-v1.0.0方案升级”一节赋能）
+
+一开始我搜到了[vite-plugin-html](https://github.com/vbenjs/vite-plugin-html)这个Vite插件，用法很简单。但发现效果不符合我的期望：我希望每次刷新都能获得随机元素，但这个插件只能实现每次重启开发服务器获得随机元素。实测，injectOptions不支持传入函数，若传入函数，会自动转为String。通过问deepseek、查Vite官方文档等方式，我又尝试了Vite自定义插件的transform钩子，但实测这个钩子并不会捕获HTML，HTML是走`transformIndexHtml`这个钩子的，这个钩子比较冷门，但可以看到[vite-plugin-html源码](https://github.com/vbenjs/vite-plugin-html/blob/main/packages/core/src/htmlPlugin.ts)用到了它。
+
+相关代码：
+
+```js
+// https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/vite-custom-plugins/playInfoMockPlugin.js
+import { getPlayInfoMock } from '../play-info-mock-dev/playInfoMock';
+
+const placeholder = '<play-info-mock />';
+
+export const playInfoMockPlugin = () => {
+  return {
+    name: 'play-info-mock-plugin',
+    enforce: 'post',
+    transformIndexHtml(code) {
+      if (!code.includes(placeholder)) {
+        return null;
+      }
+      console.log('[play-info-mock-plugin] modifying index.html:', placeholder);
+      const playInfoMock = getPlayInfoMock();
+      return code.replaceAll(placeholder, playInfoMock);
+    }
+  };
+};
+
+// https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/play-info-mock-dev/playInfoMock.js
+import fs from 'fs';
+import path from 'path';
+
+const playInfoJSFileDir = __dirname;
+
+function readMockCaseJS() {
+  const files = fs.readdirSync(playInfoJSFileDir);
+  const res = files.reduce((res, fileName) => {
+    if (!fileName.endsWith('.js')) return res;
+    if (!fileName.startsWith('case')) return res;
+    try {
+      const jsFilePath = path.resolve(playInfoJSFileDir, fileName);
+      const jsCode = fs.readFileSync(jsFilePath, 'utf8');
+      res.push(jsCode);
+    } catch (e) {
+      console.error('read js file error', fileName, e);
+    }
+    return res;
+  }, []);
+  return res;
+}
+
+export function getPlayInfoMock() {
+  const mockCases = readMockCaseJS();
+  const rndIdx = Math.floor(Math.random() * mockCases.length);
+  const mockCase = mockCases.length ? mockCases[rndIdx] : '';
+  const playInfoMock = `<script>${mockCase}</script>`;
+  return playInfoMock;
+}
+```
+
+一些解释：
+
+1. 在index.html加上这个占位符：`<play-info-mock />`。
+2. 取随机元素可以用lodash，但为了打包体积考虑，我暂且不引入，而是手打实现。
+3. 直接在相同文件夹下放测试用例。
+
+比如case2.js：`window.__playinfo__ = {}`。
 
 ## 参考资料
 
