@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import './App.scss';
-import { Button, Layout, List, message, Modal, Tag, Tooltip } from 'antd';
+import { Alert, Button, Layout, List, message, Modal, Tag, Tooltip } from 'antd';
 import {
   ArrowsAltOutlined,
   CopyOutlined,
+  DashboardTwoTone,
   DownloadOutlined,
   QuestionCircleTwoTone,
   ReloadOutlined
@@ -11,9 +12,11 @@ import {
 import { downloadM4s } from './common/request';
 import { formatFileSize, getM4sFileName } from './common/utils';
 import HansClamp from './clamp-js/HansClamp';
-import { getNewUrlsFromHtml } from './common/getUrlsFromBiliBili';
+import { getNewUrlsFromFetchApi } from './common/getUrlsFromBiliBili';
 import { downloadFileByALink } from './common/downloadFile';
 import Copyright from './contentSub/Copyright';
+import Dashboard from './headerSub/Dashboard';
+import { isInCoursePage } from './common/coursePageUtils';
 
 const { Header, Content, Footer } = Layout;
 
@@ -22,7 +25,7 @@ function getFileSizeText(fileSize) {
   return fileSize ? ` (${strSize})` : '';
 }
 
-const App = ({ initialUrls }) => {
+const App = ({ initialUrls, initialDashboardData }) => {
   const [messageApi, contextHolder] = message.useMessage();
 
   const [urls, setUrls] = useState(initialUrls);
@@ -30,8 +33,11 @@ const App = ({ initialUrls }) => {
   const [blobResult, setBlobResult] = useState(null);
   const base64SizeText = getFileSizeText(base64Result.length);
   const blobSizeText = getFileSizeText(blobResult?.size || 0);
+  // 解决对话框从关闭到打开过程的卡顿问题
+  const base64ResultOnDisplay = base64Result.substring(0, 1000);
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const copyBtnDisabled = base64Result === '';
 
   const [m4sFileName, setM4sFileName] = useState('');
@@ -71,10 +77,27 @@ const App = ({ initialUrls }) => {
     setIsDialogOpen(true);
   };
 
+  const [dashboardData, setDashboardData] = useState(initialDashboardData);
+  const [isDashboardDlgOpen, setIsDashboardDlgOpen] = useState(false);
+  const openDashboardDialog = () => {
+    setIsDashboardDlgOpen(true);
+  };
+  const handleDashboardDlgClose = () => {
+    setIsDashboardDlgOpen(false);
+  };
+
   const updateM4sUrls = async () => {
-    const newUrls = await getNewUrlsFromHtml();
+    setIsSyncing(true);
+    const { urls: newUrls, dashboardData: newDashboardData } = await getNewUrlsFromFetchApi();
     setUrls(newUrls);
-    messageApi.success('同步完成');
+    setDashboardData(newDashboardData);
+    const { err } = newDashboardData;
+    if (!err) {
+      messageApi.success('同步完成');
+    } else {
+      messageApi.error(`同步失败：${err}`);
+    }
+    setIsSyncing(false);
   };
 
   const syncBtnTooltipTitle = (
@@ -96,26 +119,54 @@ const App = ({ initialUrls }) => {
     </Button>
   );
 
+  const coursePageAlertNode = isInCoursePage() && (
+    // 写 className 的话优先级比 :where(.css-1d4w9r2).ant-alert 低，所以用内联样式
+    <Alert
+      style={{
+        marginBottom: '16px'
+      }}
+      message="在课程页面请直接点击“同步”获取音视频URL"
+      type="info"
+      showIcon
+      closable
+    />
+  );
+
+  const dashboardNode = (
+    <Dashboard
+      dashboardData={dashboardData}
+      isDashboardDlgOpen={isDashboardDlgOpen}
+      handleDashboardDlgClose={handleDashboardDlgClose}
+    />
+  );
+
   const dialogNode = (
     <Modal
-      title="B站视频下载助手"
+      title="B站音视频下载助手"
       open={isDialogOpen}
       footer={[]}
       onCancel={handleDialogClose}
       width={1000}
     >
+      {coursePageAlertNode}
       <Layout className="dialog-container">
         <Header className="download-helper-toolbar">
           <Button
             type="primary"
             icon={<ReloadOutlined />}
             onClick={updateM4sUrls}
+            loading={isSyncing}
           >
             同步
           </Button>
           <Tooltip title={syncBtnTooltipTitle}>
             <QuestionCircleTwoTone style={{ fontSize: '16px' }} />
           </Tooltip>
+          <DashboardTwoTone
+            style={{ fontSize: '16px' }}
+            title="仪表盘"
+            onClick={openDashboardDialog}
+          />
         </Header>
 
         <Content className="request-container">
@@ -195,7 +246,7 @@ const App = ({ initialUrls }) => {
             <Content className="sub-div-content result-content">
               <HansClamp
                 lines={10}
-                text={base64Result || '暂无，请先发请求'}
+                text={base64ResultOnDisplay || '暂无，请先发请求'}
               />
             </Content>
           </Layout>
@@ -212,6 +263,7 @@ const App = ({ initialUrls }) => {
     <>
       {contextHolder}
       {expandDialogBtn}
+      {dashboardNode}
       {dialogNode}
     </>
   );

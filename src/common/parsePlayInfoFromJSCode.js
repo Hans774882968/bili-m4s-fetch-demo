@@ -18,13 +18,13 @@ export function getJSObjFromObjectExpression(node, evaluated) {
     return JSON.parse(jsObjCode);
   } catch (error) {
     console.error('Error parsing JS object:', error);
-    return null;
+    return {};
   }
 }
 
 export function parsePlayInfoFromJSCode(jsCode) {
   const ast = parser.parse(jsCode);
-  let playInfo = null;
+  let playInfo = {};
   traverse(ast, {
     AssignmentExpression(path) {
       const left = path.node.left;

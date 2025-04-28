@@ -1,5 +1,13 @@
-import { M4sUrlDesc } from './M4sUrlDesc';
+import { isInBangumiPage, isInCoursePage } from './coursePageUtils';
+import { DashboardData, SOURCE_API_PUGV, SOURCE_GLOBAL } from './DashboardData';
+import { getCoursePagePlayInfoFromApi } from './getCoursePagePlayInfo';
 import { parsePlayInfoFromJSCode } from './parsePlayInfoFromJSCode';
+import {
+  BangumiPlayInfoParser,
+  CoursePlayInfoParser,
+  ParseRet,
+  VideoDetailPlayInfoParser
+} from './PlayInfoParsers';
 
 /**
  * 对话框里展示的quality就是playinfo的id
@@ -18,12 +26,23 @@ function parseScriptTags(scriptTags) {
 
 // 在同一个url请求，会得到301，但无伤大雅
 export async function getNewPlayInfoFromHtml() {
-  const resp = await fetch(window.location.href);
+  const htmlUrl = window.location.href;
+  const resp = await fetch(htmlUrl);
+  if (!resp.ok) {
+    return {
+      err: new Error(`fetch ${htmlUrl}:: ${resp.statusText}`),
+      playInfo: {}
+    };
+  }
   const htmlStr = await resp.text();
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlStr, 'text/html');
   const scriptTags = [...doc.getElementsByTagName('script')];
-  return parseScriptTags(scriptTags);
+  const playInfo = parseScriptTags(scriptTags);
+  return {
+    err: null,
+    playInfo
+  };
 }
 
 export function getPlayInfoFromScriptTag() {
@@ -36,62 +55,47 @@ export function getPlayInfoFromScriptTag() {
   return parseScriptTags(scriptTags);
 }
 
-function getAudioUrlsFromPlayInfo(playInfo) {
-  const audioList = playInfo?.data?.dash?.audio || playInfo?.result?.video_info?.dash?.audio;
-  if (!Array.isArray(audioList)) return [];
-  const res = audioList.reduce((res, cur) => {
-    const baseUrl = cur.baseUrl;
-    if (baseUrl) {
-      const m4sUrlDesc = new M4sUrlDesc(cur.baseUrl, cur.id, M4sUrlDesc.AUDIO);
-      res.push(m4sUrlDesc);
-    }
-    return res;
-  }, []);
-  return res;
+export function videoDetailAndBangumiParsePlayInfo(playInfo) {
+  let urlsObj = new ParseRet([], []);
+  if (isInBangumiPage()) {
+    const bpp = new BangumiPlayInfoParser(playInfo);
+    urlsObj = bpp.parse();
+  } else {
+    const vdpp = new VideoDetailPlayInfoParser(playInfo);
+    urlsObj = vdpp.parse();
+  }
+  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
+  return urls;
 }
 
-function tryToGetVIPVideoPreview(playInfo) {
-  const mp4VideoList = playInfo?.result?.video_info?.durl;
-  if (!Array.isArray(mp4VideoList)) return [];
-  return mp4VideoList.map((cur) => {
-    const m4sUrlDesc = new M4sUrlDesc(cur.url, 'unknown', M4sUrlDesc.VIDEO);
-    return m4sUrlDesc;
-  });
+export async function getNewUrlsFromPlayUrlApi() {
+  const { err, playInfo } = await getCoursePagePlayInfoFromApi();
+  const coursePP = new CoursePlayInfoParser(playInfo);
+  const urlsObj = coursePP.parse();
+  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
+  const dashboardData = new DashboardData(SOURCE_API_PUGV, playInfo, err);
+  return { urls, dashboardData };
 }
 
-function getVideoUrlsFromPlayInfo(playInfo) {
-  const videoList = playInfo?.data?.dash?.video || playInfo?.result?.video_info?.dash?.video;
-  if (!Array.isArray(videoList)) return tryToGetVIPVideoPreview(playInfo);
-  const qualitySet = new Set();
-  const res = videoList.reduce((res, cur) => {
-    const baseUrl = cur.baseUrl;
-    // TODO: cur.id 原则上存在，先不管它不存在的情况了
-    if (baseUrl && !qualitySet.has(cur.id)) {
-      const m4sUrlDesc = new M4sUrlDesc(cur.baseUrl, cur.id, M4sUrlDesc.VIDEO);
-      res.push(m4sUrlDesc);
-      qualitySet.add(cur.id);
-    }
-    return res;
-  }, []);
-  return res;
+export async function getNewUrlsFromCurPageHtml() {
+  const { err, playInfo } = await getNewPlayInfoFromHtml();
+  const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
+  const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, err);
+  return { urls, dashboardData };
 }
 
-export function getUrlsObjFromPlayInfo(playInfo) {
-  const audioUrls = getAudioUrlsFromPlayInfo(playInfo);
-  const videoUrls = getVideoUrlsFromPlayInfo(playInfo);
-  return { audioUrls, videoUrls };
-}
-
+// 入口1： content.js 调用
 export function getUrlsFromBiliBili() {
   const playInfo = getPlayInfoFromScriptTag();
-  const urlsObj = getUrlsObjFromPlayInfo(playInfo);
-  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
-  return urls;
+  const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
+  const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, null);
+  return { urls, dashboardData };
 }
 
-export async function getNewUrlsFromHtml() {
-  const playInfo = await getNewPlayInfoFromHtml();
-  const urlsObj = getUrlsObjFromPlayInfo(playInfo);
-  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
-  return urls;
+// 入口2：“同步”按钮调用
+export async function getNewUrlsFromFetchApi() {
+  if (isInCoursePage()) {
+    return getNewUrlsFromPlayUrlApi();
+  }
+  return getNewUrlsFromCurPageHtml();
 }

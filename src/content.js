@@ -9,14 +9,14 @@ const isDev = import.meta.env.MODE === 'development';
  * 所以需要去掉 window.addEventListener('load', () => {})
  */
 
-const initialUrls = getUrlsFromBiliBili();
+const { urls: initialUrls, dashboardData: initialDashboardData } = getUrlsFromBiliBili();
 
 if (isDev) {
-  renderDownloaderDialog(initialUrls);
+  renderDownloaderDialog(initialUrls, initialDashboardData);
 } else {
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'openDownloaderDialog') {
-      renderDownloaderDialog(initialUrls);
+      renderDownloaderDialog(initialUrls, initialDashboardData);
     }
   });
 }

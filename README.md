@@ -1,6 +1,6 @@
 [TOC]
 
-# 【Chrome插件开发】某视频网站的m4s视频/音频下载方案，及其Chrome插件实现-v250415
+# 【Chrome插件开发】某视频网站的m4s音视频下载方案，及其Chrome插件实现-v250415
 
 ## 引言
 
@@ -91,6 +91,18 @@ https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.0
 
 ![](./README_assets/4-example-v1.0.0-hide.jpg)
 
+### v1.0.0-beta
+
+https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.0-beta
+
+主界面：
+
+![](./README_assets/5-example-v1.0.0-beta-1.jpg)
+
+仪表盘：
+
+![](./README_assets/6-example-v1.0.0-beta-2.jpg)
+
 ## TODO
 
 这里只给出最重要的TODO，完整版见：其他笔记.md。
@@ -104,7 +116,10 @@ v1.0.0的版本只考虑了视频详情页的情况，所以只解析了`window.
 1. 番剧页面的对应变量是虽然一样，但值是从另一个变量`playurlSSRData`来的。
 2. 课程视频URL没有对应的全局变量来源，只能请求接口拿。
 
-所以还是要研究一下获取视频URL的API。参考了：aHR0cHM6Ly9naXRodWIuY29tLzdyaWtrYS9iaWxpYmlsaS1hcGktZG9jcy9ibG9iL21haW4vdmlkZW8vcGxheXVybF93ZWIubWQ=
+所以还是要研究一下获取视频URL的API。参考了：
+
+1. aHR0cHM6Ly9naXRodWIuY29tLzdyaWtrYS9iaWxpYmlsaS1hcGktZG9jcy9ibG9iL21haW4vdmlkZW8vcGxheXVybF93ZWIubWQ= 部分参数的含义
+2. aHR0cHM6Ly9zb2NpYWxzaXN0ZXJ5aS5naXRodWIuaW8vYmlsaWJpbGktQVBJLWNvbGxlY3QvZG9jcy9iYW5ndW1pL3ZpZGVvc3RyZWFtX3VybC5odG1s 非必要参数决定都不填
 
 视频详情页获取接口示例：
 
@@ -128,12 +143,17 @@ Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL2NoZWVzZS9wbGF5L2VwNzEyMDA3
 - https://api.example.com/pugv/player/web/playurl?avid=1354915358&cid=1556563947&qn=80&fnver=0&fnval=16&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=false&season_id=20821&isGaiaAvoided=false&ep_id=712007&voice_balance=1&drm_tech_type=2
 - https://api.example.com/pugv/player/web/playurl?avid=1655481714&cid=1572480241&qn=80&fnver=0&fnval=16&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=false&season_id=20821&isGaiaAvoided=false&ep_id=712012&voice_balance=1&drm_tech_type=2
 
-同上，由season_id和ep_id共同确定。综上：
+同上，由`season_id`和`ep_id`共同确定。综上：
 
 1. 虽然都有参数`session`，看上去是哈希值，但实测可去掉。这意味着可以直接请求接口了。
 2. 视频详情页主要是需要`avid/bvid`其一和`cid`，番剧和课程视频主要是需要`avid/bvid`其一、`cid, season_id, ep_id`，都可以在HTML里拿到。其他的参数暂且可以写死。
 
-所以我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，通过请求API拿视频URL。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
+但课程页面的视频有两种情况：
+
+1. 如果URL给的是`/ep114514`这种形式，就需要请求另一个接口才能拿到`aid, cid, season_id`：https://api.example.com/pugv/view/web/season?ep_id=712008&isGaiaAvoided=false 取`data.episodes`数组。
+2. 如果URL给的是`/ss20821`这种形式，可以直接在全局变量`window.__EduPlayPiniaState__`拿到。但实测上一行的接口直接换成`season_id=20821`，也能拿到数据。
+
+所以我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，两种情况都通过请求两个API拿视频URL（后续可以升级，让`/ss20821`的情况省一个请求）。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
 
 ## 让AI写初稿
 
@@ -443,7 +463,7 @@ export function renderDownloaderDialog(initialUrls = []) {
 }
 ```
 
-### 难点1：在万恶的manifest V3中，如何拿到视频URL
+### 难点1：在万恶的manifest V3中，如何拿到音视频URL
 
 一开始我考虑的方案非常simple非常naive：监听网络请求，匹配`30280.m4s`等。在manifest V2里，这完全OK。但现在万恶的咕果逼我们使用manifest V3，而相关资料少得可怜。
 
@@ -649,7 +669,7 @@ function parseScriptTags(scriptTags) {
 
 ### 难点2：切换到其他视频详情页，该网站并不刷新，也不更新`window.__playinfo__`
 
-这就导致我的组件拿不到最新的视频URL。我抓包发现，它请求了`https://api.example.com/x/player/wbi/playurl`，参数很复杂，不想花精力去逆向它。然后我想到，只需要用fetch API再向网页发一次请求即可。相关代码：
+这就导致我的组件拿不到最新的音视频URL。我抓包发现，它请求了`https://api.example.com/x/player/wbi/playurl`，参数很复杂，不想花精力去逆向它。然后我想到，只需要用fetch API再向网页发一次请求即可。相关代码：
 
 ```js
 // 在同一个url请求，会得到301，但无伤大雅
@@ -662,7 +682,7 @@ export async function getNewPlayInfoFromHtml() {
   return parseScriptTags(scriptTags);
 }
 
-export async function getNewUrlsFromHtml() {
+export async function getNewUrlsFromFetchApi() {
   const playInfo = await getNewPlayInfoFromHtml();
   const urlsObj = getUrlsObjFromPlayInfo(playInfo);
   const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
@@ -676,7 +696,7 @@ export async function getNewUrlsFromHtml() {
   const [urls, setUrls] = useState(initialUrls);
 
   const updateM4sUrls = async () => {
-    const newUrls = await getNewUrlsFromHtml();
+    const newUrls = await getNewUrlsFromFetchApi();
     setUrls(newUrls);
     messageApi.success('同步完成');
   };
@@ -889,6 +909,18 @@ export function getPlayInfoMock() {
 3. 直接在相同文件夹下放测试用例。
 
 比如case2.js：`window.__playinfo__ = {}`。
+
+### 常规2：引入单测
+
+对于Vite项目，可以用`vitest`。虽然它是基于Jest，而Jest的配置很麻烦，也很容易踩坑，但它真正做到了开箱即用。vitest好文明！安装：`yarn add -D vitest`。
+
+TODO
+
+### 难点6：同时支持视频详情页、番剧的免费+会员、课程的免费+会员
+
+TODO
+
+为此，我们单独提取出了[src\common\PlayInfoParsers.js](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/common/PlayInfoParsers.js)。我们设计了一个基类`PlayInfoParser`和3个子类`VideoDetailPlayInfoParser, BangumiPlayInfoParser, CoursePlayInfoParser`。
 
 ## 参考资料
 

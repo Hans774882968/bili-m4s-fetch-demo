@@ -4,7 +4,7 @@ import App from './App.jsx';
 
 let dialogRef = null;
 
-export function renderDownloaderDialog(initialUrls = []) {
+export function renderDownloaderDialog(initialUrls = [], initialDashboardData = {}) {
   if (dialogRef) {
     return;
   }
@@ -15,7 +15,10 @@ export function renderDownloaderDialog(initialUrls = []) {
   dialogRef = dialog;
   createRoot(dialog).render(
     <StrictMode>
-      <App initialUrls={initialUrls} />
+      <App
+        initialUrls={initialUrls}
+        initialDashboardData={initialDashboardData}
+      />
     </StrictMode>,
   );
 }

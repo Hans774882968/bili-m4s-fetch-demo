@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
           { src: 'src/images', dest: destName },
           { src: 'background.js', dest: destName },
           { src: 'manifest.json', dest: destName },
+          { src: 'popup.html', dest: destName },
         ],
         hook: 'writeBundle',
       }),

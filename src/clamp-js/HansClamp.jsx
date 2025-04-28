@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { clamp } from 'clamp-js-main';
 
-export default function HansClamp({ text, lines, className = '' }) {
+export default function HansClamp({ text, lines, ...rest }) {
   const textRef = useRef(null);
 
   useEffect(() => {
@@ -11,7 +11,7 @@ export default function HansClamp({ text, lines, className = '' }) {
   }, [text, lines]);
 
   return (
-    <div ref={textRef} className={className}>
+    <div ref={textRef} {...rest}>
       {text}
     </div>
   );

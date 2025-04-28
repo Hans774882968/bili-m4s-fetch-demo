@@ -17,7 +17,8 @@
   },
   "action": {
     "default_icon": "images/bili.png",
-    "default_title": "Bili M4S Fetch Demo"
+    "default_title": "Bili M4S Fetch Demo",
+    "default_popup": "popup.html"
   },
   "icons": {
     "128": "images/bili.png"
