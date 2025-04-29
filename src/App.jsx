@@ -16,7 +16,7 @@ import { getNewUrlsFromFetchApi } from './common/getUrlsFromBiliBili';
 import { downloadFileByALink } from './common/downloadFile';
 import Copyright from './contentSub/Copyright';
 import Dashboard from './headerSub/Dashboard';
-import { isInCoursePage } from './common/coursePageUtils';
+import { isInCoursePage } from './utils/coursePage';
 
 const { Header, Content, Footer } = Layout;
 

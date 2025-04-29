@@ -1,4 +1,5 @@
-import { isInBangumiPage, isInCoursePage } from './coursePageUtils';
+import { isInBangumiPage } from '../utils/bangumiPage';
+import { isInCoursePage } from '../utils/coursePage';
 import { DashboardData, SOURCE_API_PUGV, SOURCE_GLOBAL } from './DashboardData';
 import { getCoursePagePlayInfoFromApi } from './getCoursePagePlayInfo';
 import { parsePlayInfoFromJSCode } from './parsePlayInfoFromJSCode';

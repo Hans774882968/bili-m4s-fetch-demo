@@ -4,12 +4,6 @@ export function isInCoursePage() {
   return url.startsWith('/cheese/play');
 }
 
-// TODO: 改文件名或移到别处
-export function isInBangumiPage() {
-  const url = window.location.pathname;
-  return url.startsWith('/bangumi/play');
-}
-
 export function getEpIdOrSeasonId(url) {
   const urlObj = new URL(url);
   const curUrlPathParts = urlObj.pathname.split('/');

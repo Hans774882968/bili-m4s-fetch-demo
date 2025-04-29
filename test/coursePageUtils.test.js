@@ -1,5 +1,5 @@
 import { expect, describe, it } from 'vitest';
-import { getEpIdOrSeasonId } from '../src/common/coursePageUtils';
+import { getEpIdOrSeasonId } from '../src/utils/coursePage';
 
 describe('coursePageUtils', () => {
   it('getEpIdOrSeasonId', () => {

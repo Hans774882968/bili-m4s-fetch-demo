@@ -103,12 +103,6 @@ https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.0-beta
 
 ![](./README_assets/6-example-v1.0.0-beta-2.jpg)
 
-## TODO
-
-这里只给出最重要的TODO，完整版见：其他笔记.md。
-
-> 1. 番剧页面的代码要求我们改用**Babel AST**来分析代码，而且`window.__playinfo__`的数据结构也和视频详情页不同。如下文`bangumi.js`所示。另外，限免集和会员集的数据结构也不一样。限免集是有`video_info.dash`的，仍然给你视频和音频的m4s；会员集则只有`video_info.durls`，直接给你mp4文件。
-
 ## 250425更新：网站逆向分析
 
 v1.0.0的版本只考虑了视频详情页的情况，所以只解析了`window.__playinfo__`。但后来发现：
@@ -153,7 +147,9 @@ Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL2NoZWVzZS9wbGF5L2VwNzEyMDA3
 1. 如果URL给的是`/ep114514`这种形式，就需要请求另一个接口才能拿到`aid, cid, season_id`：https://api.example.com/pugv/view/web/season?ep_id=712008&isGaiaAvoided=false 取`data.episodes`数组。
 2. 如果URL给的是`/ss20821`这种形式，可以直接在全局变量`window.__EduPlayPiniaState__`拿到。但实测上一行的接口直接换成`season_id=20821`，也能拿到数据。
 
-所以我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，两种情况都通过请求两个API拿视频URL（后续可以升级，让`/ss20821`的情况省一个请求）。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
+关于请求响应体：经过粗略观察可知，可以分为5种情况：视频详情页、免费番剧、VIP番剧、免费课程、VIP课程。免费的会分为`audio`的m4s数组和`video`的m4s数组；VIP的则只会给出`durls`的mp4数组。对于**所有的免费场景和所有的VIP场景，数组的数据结构都大同小异**，暂时可以用同一套代码。虽然视频详情页没有VIP的情况，但我们为了代码架构设计方便，**不妨假设视频详情页也有VIP的情况**。于是我决定，实现一个基类`class PlayInfoParser`和三个子类，每个子类内部自己处理好免费和VIP两种情况的JSON数据。
+
+综上，我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，两种情况都通过请求两个API拿视频URL（后续可以升级，让`/ss20821`的情况省一个请求）。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
 
 ## 让AI写初稿
 
@@ -843,6 +839,21 @@ export default function HansClamp({ text, lines, className = '' }) {
             </Content>
 ```
 
+### 常规2：过长的base64字符串引起的卡顿问题——“用户思维”又一例
+
+我们已经做了多行文本省略功能，但文本毕竟在那里占着空间。所以当对话框由不显示变为显示时，会出现比较严重的卡顿。同样地，使用用户思维，直接把显示给用户看的字符串换成被截断的版本即可。这样就避免了一切技术难题。
+
+```jsx
+const base64ResultOnDisplay = base64Result.substring(0, 1000);
+
+            <Content className="sub-div-content result-content">
+              <HansClamp
+                lines={10}
+                text={base64ResultOnDisplay || '暂无，请先发请求'}
+              />
+            </Content>
+```
+
 ### 难点5：用`transformIndexHtml`实现：开发环境下，页面每次刷新，都向index.html注入随机的JS代码，方便测试（为“难点1-v1.0.0方案升级”一节赋能）
 
 一开始我搜到了[vite-plugin-html](https://github.com/vbenjs/vite-plugin-html)这个Vite插件，用法很简单。但发现效果不符合我的期望：我希望每次刷新都能获得随机元素，但这个插件只能实现每次重启开发服务器获得随机元素。实测，injectOptions不支持传入函数，若传入函数，会自动转为String。通过问deepseek、查Vite官方文档等方式，我又尝试了Vite自定义插件的transform钩子，但实测这个钩子并不会捕获HTML，HTML是走`transformIndexHtml`这个钩子的，这个钩子比较冷门，但可以看到[vite-plugin-html源码](https://github.com/vbenjs/vite-plugin-html/blob/main/packages/core/src/htmlPlugin.ts)用到了它。
@@ -910,17 +921,231 @@ export function getPlayInfoMock() {
 
 比如case2.js：`window.__playinfo__ = {}`。
 
-### 常规2：引入单测
+### 常规3：引入单测
 
-对于Vite项目，可以用`vitest`。虽然它是基于Jest，而Jest的配置很麻烦，也很容易踩坑，但它真正做到了开箱即用。vitest好文明！安装：`yarn add -D vitest`。
+对于Vite项目，可以用`vitest`。我们知道，Jest的配置很麻烦，也很容易踩坑，比如我之前做的[关于reres项目的开源项目](https://www.52pojie.cn/thread-1757481-1-1.html)。虽然`vitest`基于Jest，但它真正做到了开箱即用。vitest好文明！安装：`yarn add -D vitest`。`package.json`新增：`"test": "vitest"`。是的，不需要任何其他配置了，就是这么简单。
 
-TODO
+`.test.js`书写方式和Jest稍有不同：
+
+```js
+import { expect, describe, it, vi, beforeEach, afterEach } from 'vitest';
+```
+
+我这次基本上都是用deepseek生成的单测用例，发现自己连review AI生成的代码都懒得了。
+
+mock dayjs技巧：根据[vitest官方文档](https://vitest.dev/guide/mocking.html#dates)，不需要像deepseek说的那样，用这种具备一般性的方式：
+
+```js
+  const originalDayjs = dayjs;
+  
+  beforeEach(() => {
+    // 在每个测试前 mock dayjs
+    vi.mock('dayjs', () => {
+      const mockDayjs = vi.fn(() => ({
+        format: vi.fn(() => '20230101120000') // 固定返回的日期字符串
+      }));
+      return mockDayjs;
+    });
+  });
+  
+  afterEach(() => {
+    // 在每个测试后恢复原始 dayjs
+    vi.restoreAllMocks();
+    dayjs = originalDayjs;
+  });
+```
+
+而是：
+
+```js
+  beforeEach(() => {
+    // tell vitest we use mocked time
+    vi.useFakeTimers()
+  })
+```
+
+我项目里的相关代码：
+
+```js
+  beforeEach(() => {
+    vi.useFakeTimers();
+    const date = new Date(2023, 0, 13, 14, 15, 16);
+    vi.setSystemTime(date);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+```
+
+单独样例取消mock，只需要提前调用`vi.useRealTimers()`：
+
+```js
+  it('should use current time when no mock is provided', () => {
+    vi.useRealTimers();
+  });
+```
 
 ### 难点6：同时支持视频详情页、番剧的免费+会员、课程的免费+会员
 
-TODO
+注意到，我之前只考虑视频详情页的解析时，代码是比较杂乱的。现在为了同时支持5种场景的响应体JSON数据解析，我不得不重新思考如何组织代码。为此，我单独提取出了[src\common\PlayInfoParsers.js](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/common/PlayInfoParsers.js)。我设计了一个基类`PlayInfoParser`和3个子类`VideoDetailPlayInfoParser, BangumiPlayInfoParser, CoursePlayInfoParser`。调用者一致调用`parse`方法即可获得视频和音频。而视频和音频的提取，分为3种情况：VIP只有mp4、免费的video.m4s、免费的audio.m4s，
 
-为此，我们单独提取出了[src\common\PlayInfoParsers.js](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/common/PlayInfoParsers.js)。我们设计了一个基类`PlayInfoParser`和3个子类`VideoDetailPlayInfoParser, BangumiPlayInfoParser, CoursePlayInfoParser`。
+> 对于**所有的免费场景和所有的VIP场景，数组的数据结构都大同小异**，暂时可以用同一套代码。
+
+所以有3个共用的方法，供3个子类Parser共用：
+
+```js
+  _parseVipMp4VideoListCommon(mp4VideoList) {
+    if (!Array.isArray(mp4VideoList)) return [];
+    return mp4VideoList.map((cur) => {
+      const mp4Url = cur.durl[0].url || '';
+      const m4sUrlDesc = new M4sUrlDesc(mp4Url, cur.quality, M4sUrlDesc.VIDEO);
+      return m4sUrlDesc;
+    });
+  }
+
+  _parseOrdinaryVideoCommon(videoList) {
+    const qualitySet = new Set();
+    const res = videoList.reduce((res, cur) => {
+      const baseUrl = cur.baseUrl || cur.base_url;
+      // TODO: cur.id 原则上存在，先不管它不存在的情况了
+      if (baseUrl && !qualitySet.has(cur.id)) {
+        const m4sUrlDesc = new M4sUrlDesc(baseUrl, cur.id, M4sUrlDesc.VIDEO);
+        res.push(m4sUrlDesc);
+        qualitySet.add(cur.id);
+      }
+      return res;
+    }, []);
+    return res;
+  }
+
+  _parseOrdinaryAudioCommon(audioList) {
+    if (!Array.isArray(audioList)) return [];
+    const res = audioList.reduce((res, cur) => {
+      const baseUrl = cur.baseUrl || cur.base_url;
+      if (baseUrl) {
+        const m4sUrlDesc = new M4sUrlDesc(baseUrl, cur.id, M4sUrlDesc.AUDIO);
+        res.push(m4sUrlDesc);
+      }
+      return res;
+    }, []);
+    return res;
+  }
+```
+
+子类共用的parse方法：
+
+```js
+  parse() {
+    if (this.isVipPlayInfo()) {
+      return new ParseRet([], this.parseVipMp4());
+    }
+    return new ParseRet(this.parseOrdinaryAudio(), this.parseOrdinaryVideo());
+  }
+```
+
+每个子类去判断是不是VIP视频的JSON，都不难。以番剧页面为例：
+
+```js
+  isVipPlayInfo() {
+    const videoList = this.playInfo?.result?.video_info?.dash?.video;
+    return !Array.isArray(videoList);
+  }
+```
+
+调用方：
+
+```js
+export function videoDetailAndBangumiParsePlayInfo(playInfo) {
+  let urlsObj = new ParseRet([], []);
+  if (isInBangumiPage()) {
+    const bpp = new BangumiPlayInfoParser(playInfo);
+    urlsObj = bpp.parse();
+  } else {
+    const vdpp = new VideoDetailPlayInfoParser(playInfo);
+    urlsObj = vdpp.parse();
+  }
+  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
+  return urls;
+}
+
+export async function getNewUrlsFromPlayUrlApi() {
+  const { err, playInfo } = await getCoursePagePlayInfoFromApi();
+  const coursePP = new CoursePlayInfoParser(playInfo);
+  const urlsObj = coursePP.parse();
+  const urls = [...urlsObj.videoUrls, ...urlsObj.audioUrls];
+  const dashboardData = new DashboardData(SOURCE_API_PUGV, playInfo, err);
+  return { urls, dashboardData };
+}
+
+export async function getNewUrlsFromCurPageHtml() {
+  const { err, playInfo } = await getNewPlayInfoFromHtml();
+  const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
+  const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, err);
+  return { urls, dashboardData };
+}
+
+// 入口1： content.js 调用
+export function getUrlsFromBiliBili() {
+  const playInfo = getPlayInfoFromScriptTag();
+  const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
+  const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, null);
+  return { urls, dashboardData };
+}
+
+// 入口2：“同步”按钮调用
+export async function getNewUrlsFromFetchApi() {
+  if (isInCoursePage()) {
+    return getNewUrlsFromPlayUrlApi();
+  }
+  return getNewUrlsFromCurPageHtml();
+}
+```
+
+### 常规4：仪表盘
+
+简单给一个数据结构：
+
+```js
+export const SOURCE_GLOBAL = Symbol('JS global variable');
+export const SOURCE_API_PUGV = Symbol('api pugv/player/web/playurl');
+
+export class DashboardData {
+  constructor(source, playInfoJson, err) {
+    this.source = source;
+    this.playInfoJson = playInfoJson;
+    this.err = err;
+  }
+
+  getSourceText() {
+    if (this.source === SOURCE_GLOBAL) {
+      return 'JS全局变量';
+    }
+    if (this.source === SOURCE_API_PUGV) {
+      return 'API pugv/player/web/playurl';
+    }
+    return '未知来源';
+  }
+
+  getErrText() {
+    return this.err ? String(this.err) : '';
+  }
+}
+```
+
+在解析完playInfo后写一行耦合的代码，和解析出的音视频URL一起透传给组件即可。比如：
+
+```js
+// 入口1： content.js 调用
+export function getUrlsFromBiliBili() {
+  const playInfo = getPlayInfoFromScriptTag();
+  const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
+  const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, null);
+  return { urls, dashboardData };
+}
+```
+
+在Dashboard.jsx里要展示JSON数据，查互联网可知，直接使用`react-json-view`，但因为原仓库停止维护了，所以根据其README的建议，用：`yarn add @microlink/react-json-view`。组件很容易用，完整代码就不贴了，[传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/headerSub/Dashboard.jsx)。
 
 ## 参考资料
 

@@ -1,4 +1,4 @@
-import { getEpIdOrSeasonId } from './coursePageUtils';
+import { getEpIdOrSeasonId } from '../utils/coursePage';
 
 export function getWebSeasonApiUrl({ epId, seasonId }) {
   const WEB_SEASON_API_URL = 'https://api.bilibili.com/pugv/view/web/season';
