@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bili M4S Fetch Demo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Fetch and download Bilibili m4s audios and videos, with extremely user-friendly interface",
   "permissions": [
     "activeTab",

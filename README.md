@@ -69,7 +69,7 @@ async function downloader(url, rangeStart = 0) {
 downloader('<m4s file url>');
 ```
 
-其他函数不变，`sendXhrReq`改成`sendFetchReq`，将原本的`XMLHttpRequest`改成现在的`fetch API`。
+其他函数不变，`sendXhrReq`改成`sendFetchReq`，将原本的`XMLHttpRequest`改成现在的`fetch API`。很轻松就跑通了。
 
 写完这段代码后一段时间，我刷到了[码农高天的视频](https://www.bilibili.com/video/BV18oQXYKEj3)。我想，现在LLM已经很厉害了，不妨让AI辅助我，根据这段代码，快速生成一个Chrome插件。
 
@@ -102,6 +102,58 @@ https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.0-beta
 仪表盘：
 
 ![](./README_assets/6-example-v1.0.0-beta-2.jpg)
+
+### v1.0.1
+
+https://github.com/Hans774882968/bili-m4s-fetch-demo/releases/tag/v1.0.1
+
+主界面：
+
+![](./README_assets/7-example-v1.0.1-1.jpg)
+
+仪表盘：
+
+![](./README_assets/8-example-v1.0.1-2.jpg)
+
+添加URL到URL列表：
+
+![](./README_assets/9-example-v1.0.1-3.jpg)
+
+## 项目主要技术亮点
+
+目前主要是AI生成的，我微调一下。
+
+1. **Chrome插件开发**
+    - 使用Manifest V3规范，涉及`content.js`、`background.js`和`popup.js`的分层架构。
+    - 通过`chrome.contextMenus`实现右键菜单功能，结合`documentUrlPatterns`限制菜单显示范围。
+    - 跨层通信（如`chrome.runtime.onMessage`）和动态注入React组件到页面。
+2. **请求处理与跨域问题**
+    - 使用`fetch API`下载音视频文件，通过调整请求头（如根据报错信息多次删除`pragma`）解决CORS问题。
+    - 分块下载（`range`请求）和进度监控（通过`reader.read()`实现）。
+3. **前端工程化**
+    - **Vite**：作为构建工具，配置`rollupOptions`优化打包（如固定文件名、多入口处理）。
+    - **React 18**：结合`react-dom`动态挂载组件，使用Hooks（如`useState`、`useEffect`）管理状态。
+    - **Polyfill**：通过`vite-plugin-node-polyfills`解决Node模块（如`process`、`path`）在浏览器端的兼容性问题。
+4. **数据处理与解析**
+    - **Babel AST**：解析网页中的JS代码（如`window.__playinfo__`），提取音视频URL。
+    - **JSON处理**：动态解析接口响应，区分免费/VIP资源的多种数据结构（如`dash`和`durls`）。
+5. **UI与交互优化**
+    - **Ant Design**：使用组件库实现弹窗、表格、进度条等UI。
+    - **文本截断**：通过`clamp-js-main`实现多行文本省略。
+    - **文件下载**：基于`Blob`和`URL.createObjectURL`实现前端文件下载。
+6. **调试与测试**
+    - **Mock数据**：利用Vite自定义插件（`transformIndexHtml`钩子）动态注入测试用例。
+    - **单元测试**：使用`vitest`进行测试，模拟日期和API请求。
+7. **性能优化**
+    - 避免长字符串渲染卡顿，如截断Base64展示，**用户思维**主导的文本截断可规避DOM渲染的卡顿问题。
+    - 按需加载依赖（如避免引入未使用的Lodash功能）。
+8. **逆向分析**
+    - 通过抓包分析网站API（如`/x/player/wbi/playurl`），处理不同页面（视频、番剧、课程）的数据源差异。
+9. **工具链**
+    - **ESLint**：配置全局变量（如`chrome`、`__dirname`）的语法检查。
+    - **Rollup插件**：如`rollup-plugin-copy`复制静态资源，`rollup-plugin-visualizer`分析打包体积。
+
+这些技术点共同支撑了一个功能完善的音视频下载插件，覆盖了从网络请求到UI交互的全链路开发。
 
 ## 250425更新：网站逆向分析
 
@@ -150,6 +202,8 @@ Sample URL：aHR0cHM6Ly93d3cuYmlsaWJpbGkuY29tL2NoZWVzZS9wbGF5L2VwNzEyMDA3
 关于请求响应体：经过粗略观察可知，可以分为5种情况：视频详情页、免费番剧、VIP番剧、免费课程、VIP课程。免费的会分为`audio`的m4s数组和`video`的m4s数组；VIP的则只会给出`durls`的mp4数组。对于**所有的免费场景和所有的VIP场景，数组的数据结构都大同小异**，暂时可以用同一套代码。虽然视频详情页没有VIP的情况，但我们为了代码架构设计方便，**不妨假设视频详情页也有VIP的情况**。于是我决定，实现一个基类`class PlayInfoParser`和三个子类，每个子类内部自己处理好免费和VIP两种情况的JSON数据。
 
 综上，我决定，在视频详情页和番剧页面，通过读全局变量拿视频URL；在课程页面，两种情况都通过请求两个API拿视频URL（后续可以升级，让`/ss20821`的情况省一个请求）。另外，要提供一个表单，允许用户抓包拿到视频URL后将其添加进我们插件的URL列表。
+
+TODO: 课程页面`/ss20821`的场景，如何拿到用户的观看进度数据？我已经找到相关API，但不知道为什么，重放请求失败。
 
 ## 让AI写初稿
 
@@ -429,7 +483,7 @@ eslint 8的老配置是：`{ env: { node: true, browser: true }}`（它们并不
   ],
 ```
 
-接着，修改打包配置：`build.rollupOptions.output.assetFileNames: '[name].[ext]'`。然后，React组件正常import CSS文件就行：`import './App.scss';`。为了使用`scss`，需要先装好`sass`包：`yarn add -D sass`。
+接着，修改打包配置：`build.rollupOptions.output.assetFileNames: '[name].[ext]'`。然后，React组件正常import CSS文件就行：`import './App.scss';`。为了使用`scss`，需要先装好`sass`包：`yarn add -D sass`。然后，其他配置都不需要了，直接写就OK。
 
 ### 让`content.js`挂载组件
 
@@ -662,6 +716,90 @@ function parseScriptTags(scriptTags) {
 ```
 
 反复调试，在这个include里不断添加，直到控制台不报错为止。
+
+### 难点1-250508更新：进一步使用Babel AST，应对番剧页面的更新
+
+8号测插件的时候，我发现番剧的网页源代码的JS代码更新了，多了一种可能的返回：
+
+```js
+const playurlSSRData = {}
+if (playurlSSRData && typeof playurlSSRData === 'object' && !!playurlSSRData.body && true) {
+  window.__playinfo__ = playurlSSRData.raw
+}
+```
+
+所以我需要写段代码兼容这种新情况。一开始我给deepseek的prompt比较模糊，如下：
+
+>这份代码已经实现从两种情况中获取到`window.__playinfo__`的值，现在希望在此基础上新增对第三种情况的支持：`const playurlSSRData = { "raw": { "data": { "from": "local" } } }; window.__playinfo__ = playurlSSRData.raw`。这里不一定只有一层，也可以是`playurlSSRData.raw.x.y.z`之类的，任意多层。
+
+它生成的代码确实也不能正确工作。于是我叫它按照我自己的一个很直观的思路去写代码，就得到可用的代码了。
+
+> 该代码并未成功实现多层属性访问。resolveMemberExpression改名为resolveMemberExpressionRight。我希望你重写该方法，采用我给你的思路：首先收集右侧的属性访问数组，比如`playurlSSRData.raw.x.y.z`对应`['raw', 'x', 'y', 'z']`，然后拿到playurlSSRData的对象字面量，最后通过上述数组进行对象字面量的属性访问。
+
+代码：
+
+```js
+export function resolveMemberExpressionRight(path, scope) {
+  const propertyAccessChain = [];
+  let currentPath = path;
+  let baseObject = null;
+
+  // 1. 收集属性访问链
+  while (currentPath.isMemberExpression()) {
+    const property = currentPath.get('property').node;
+
+    // 获取属性名（支持标识符、字符串和数字字面量）
+    let propertyName = null;
+    if (isIdentifier(property)) {
+      propertyName = property.name;
+    } else if (isStringLiteral(property)) {
+      propertyName = property.value;
+    } else if (isNumericLiteral(property)) {
+      propertyName = property.value;
+    } else {
+      return null; // 不支持的属性类型
+    }
+
+    propertyAccessChain.unshift(propertyName);
+    currentPath = currentPath.get('object');
+  }
+
+  // 2. 获取基础对象
+  if (currentPath.isIdentifier()) {
+    const binding = scope.getBinding(currentPath.node.name);
+    if (!binding) return null;
+    const init = binding.path.node.init;
+    if (!isObjectExpression(init)) {
+      return null;
+    }
+    const evaluated = binding.path.get('init').evaluate();
+    baseObject = getJSObjFromObjectExpression(init, evaluated);
+  } else if (currentPath.isObjectExpression()) {
+    const evaluated = currentPath.evaluate();
+    baseObject = getJSObjFromObjectExpression(currentPath.node, evaluated);
+  } else {
+    return null; // 不支持的类型
+  }
+
+  // 3. 按照属性链访问对象
+  let result = baseObject;
+  for (const prop of propertyAccessChain) {
+    if (result && typeof result === 'object' && prop in result) {
+      result = result[prop];
+    } else {
+      return null; // 属性访问失败。实际值是 undefined 但我们返回 null
+    }
+  }
+
+  return result;
+}
+
+      // Case 3: Variable assignment (member expression, nested property access)
+      if (isMemberExpression(right)) {
+        playInfo = resolveMemberExpressionRight(path.get('right'), path.scope);
+        return;
+      }
+```
 
 ### 难点2：切换到其他视频详情页，该网站并不刷新，也不更新`window.__playinfo__`
 
@@ -1070,6 +1208,7 @@ export function videoDetailAndBangumiParsePlayInfo(playInfo) {
 }
 
 export async function getNewUrlsFromPlayUrlApi() {
+  // https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/common/getCoursePagePlayInfo.js
   const { err, playInfo } = await getCoursePagePlayInfoFromApi();
   const coursePP = new CoursePlayInfoParser(playInfo);
   const urlsObj = coursePP.parse();
@@ -1086,7 +1225,7 @@ export async function getNewUrlsFromCurPageHtml() {
 }
 
 // 入口1： content.js 调用
-export function getUrlsFromBiliBili() {
+export function getUrlsFromExampleCom() {
   const playInfo = getPlayInfoFromScriptTag();
   const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
   const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, null);
@@ -1099,6 +1238,48 @@ export async function getNewUrlsFromFetchApi() {
     return getNewUrlsFromPlayUrlApi();
   }
   return getNewUrlsFromCurPageHtml();
+}
+```
+
+#### 易错点：fetch是会抛异常的
+
+在“250425更新：网站逆向分析”一节提到，我们需要请求两个接口，才能拿到课程页面的`playInfo`。我把相关函数命名为`getCoursePagePlayInfoFromApi`。我在此做异常处理时，采用了Go语言推崇的写法，因为我需要把失败的情况展示到仪表盘。
+
+```js
+  const { err, webSeasonInfo } = await getWebSeasonInfo(epOrSeason);
+  if (err) {
+    return {
+      err,
+      playInfo: {}
+    };
+  }
+```
+
+这就要求我的函数不能抛出异常。但我还是在测试的时候才发现fetch是会抛异常的。所以我的fetch需要包一层try catch。比如请求第一个接口的函数得这么写，可以看到它变得更冗长了。
+
+```js
+export async function getWebSeasonInfo(epOrSeason) {
+  const webSeasonApiUrl = getWebSeasonApiUrl(epOrSeason);
+  let resp = null;
+  try {
+    resp = await fetch(webSeasonApiUrl);
+  } catch (err) {
+    return {
+      err: new Error(`fetch ${webSeasonApiUrl}:: ${err.message || ''}`),
+      webSeasonInfo: {}
+    };
+  }
+  if (!resp.ok) {
+    return {
+      err: new Error(`fetch ${webSeasonApiUrl}:: ${resp.statusText}`),
+      webSeasonInfo: {}
+    };
+  }
+  const webSeasonInfo = await resp.json();
+  return {
+    err: null,
+    webSeasonInfo
+  };
 }
 ```
 
@@ -1137,7 +1318,7 @@ export class DashboardData {
 
 ```js
 // 入口1： content.js 调用
-export function getUrlsFromBiliBili() {
+export function getUrlsFromExampleCom() {
   const playInfo = getPlayInfoFromScriptTag();
   const urls = videoDetailAndBangumiParsePlayInfo(playInfo);
   const dashboardData = new DashboardData(SOURCE_GLOBAL, playInfo, null);
@@ -1145,10 +1326,226 @@ export function getUrlsFromBiliBili() {
 }
 ```
 
-在Dashboard.jsx里要展示JSON数据，查互联网可知，直接使用`react-json-view`，但因为原仓库停止维护了，所以根据其README的建议，用：`yarn add @microlink/react-json-view`。组件很容易用，完整代码就不贴了，[传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/headerSub/Dashboard.jsx)。
+在`Dashboard.jsx`里要展示JSON数据，查互联网可知，直接使用`react-json-view`，但因为原仓库停止维护了，所以根据其README的建议，用：`yarn add @microlink/react-json-view`。组件很容易用，完整代码就不贴了，[传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/headerSub/Dashboard.jsx)。为了让长文本不溢出组件，需要给`ReactJsonView`传参`style={{ overflow: 'auto' }}`。
+
+### 常规5：小优化：文件命名升级为从文档标题提取有效文件名
+
+该网站的文档标题会在不刷新页面的情况下变化，为了获取标题并应对变化，最简单的做法就是自己封装一个hook，[传送门](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/hooks/useDocumentTitle.js)。
+
+```js
+import { useEffect, useState } from 'react';
+
+export default function useDocumentTitle(initialTitle = '') {
+  const [title, setTitle] = useState(initialTitle || document.title);
+
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      if (document.title !== title) {
+        setTitle(document.title);
+      }
+    });
+
+    observer.observe(document.querySelector('title'), {
+      childList: true,
+    });
+
+    return () => observer.disconnect();
+  }, [title]);
+
+  return title;
+};
+
+```
+
+主要的点，就是用`MutationObserver`监听`document.title`的变化。
+
+下一步，是从任意字符串中拿到一个合法的文件名，如果结果为空，就用之前我的方案，即用日期命名，兜底。一开始我是让AI生成的，AI给的代码大致如下：
+
+```js
+  let cleaned = title.replace(/[\\/:*?"<>|]/g, '_');
+  cleaned = cleaned.trim().replace(/^\.+|\.+$/g, '');
+  cleaned = cleaned.substring(0, 255);
+```
+
+但后来才想到，这种通用需求肯定有npm包的。于是查到这个包：`yarn add filenamify`。
+
+```js
+import filenamify from 'filenamify';
+
+export function getValidFileName(fileName) {
+  let cleanedFileName = removeUselessSuffix(fileName); // 下文有解释
+  cleanedFileName = filenamify(cleanedFileName, { replacement: '_' });
+  cleanedFileName = cleanedFileName.trim().replace(/^\.+|\.+$/g, '');
+  return cleanedFileName;
+}
+```
+
+但是打包的时候遇到一个警告：
+
+```
+[plugin vite:resolve] Module "node:path" has been externalized for browser compatibility, imported by "<path>/bili-m4s-fetch-demo/node_modules/filenamify/filenamify-path.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+```
+
+实测这个警告不影响运行，但我还是想让这个警告消失。点开警告里的链接，里面说
+
+>This is because Vite does not automatically polyfill Node.js modules.
+>
+>We recommend avoiding Node.js modules for browser code to reduce the bundle size, although you can add polyfills manually. If the module is imported from a third-party library (that's meant to be used in the browser), it's advised to report the issue to the respective library.
+
+警告产生的原因是，我将用于node的包用于浏览器端。不建议引入polyfill，因为包会太大，但我还是选择手动添加polyfill。
+
+```js
+      nodePolyfills({
+        include: ['process', 'path'],
+      }),
+```
+
+注意到文档标题带有我们不想要的后缀，所以我希望彻底去除这些后缀。这是一道简单算法题，可以扔给AI做。prompt如下：
+
+> 我有一个数组：const uselessSuffixTexts = [/* 省略 */];我希望实现一个函数去除字符串的后缀，使得它不以该数组的任何一个元素结尾。
+
+第一版代码不对，但之后调整一下prompt，AI就明白了：“你想要**递归地**去除所有匹配的后缀，直到字符串不再以任何指定的后缀结尾。”
+
+```js
+export function removeUselessSuffix(text) {
+  const uselessSuffixTexts = [/* 省略 */];
+  // 按长度从长到短排序，优先匹配更长的后缀
+  const sortedSuffixes = [...uselessSuffixTexts].sort((a, b) => b.length - a.length);
+  let res = text;
+  let changed = false;
+  do {
+    changed = false;
+    for (const suffix of sortedSuffixes) {
+      if (res.endsWith(suffix)) {
+        res = res.slice(0, -suffix.length);
+        changed = true;
+        break;
+      }
+    }
+  } while (changed);
+  return res;
+}
+```
+
+最后是显示问题。我发现，标题往往太长，但antd的Header无法容纳两行文本，如果希望容纳多行文本，得把它换成我之前封装的`HansClamp`。
+
+```jsx
+                <div className="m4s-download-info-wrap">
+                  <HansClamp
+                    lines={3}
+                    text={m4sDownloadSuccessInfoText}
+                    title={m4sDownloadSuccessInfoText}
+                  />
+                  {/* ... */}
+                </div>
+```
+
+相关CSS：
+
+```scss
+    %header-like-common-styles {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      background-color: white;
+      border-bottom: 1px solid #eee;
+    }
+
+    .m4s-download-info-wrap {
+      @extend %header-like-common-styles;
+      padding: 16px;
+    }
+```
+
+### 常规6：实现下载进度条
+
+我们是用fetch API实现下载的，查搜索引擎可知，获取下载进度的模板代码随处可得，比如[参考链接4](https://tutorial.javascript.ac.cn/web-apis/fetch-tracking-download-progress/)。如下：
+
+```js
+  const resp = await fetch(url);
+  const reader = resp.body.getReader();
+  const contentLength = Number(resp.headers.get('content-length')) || 0;
+  // callback(0, contentLength);
+  let receivedLength = 0;
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    receivedLength += value.length;
+    // callback(receivedLength, contentLength);
+  }
+  return new Blob(chunks);
+```
+
+这是一个纯JS函数，那React组件调用它时，如何让它通知React组件更新进度条？这是一个主动权反转的问题，答案不难，用回调函数。因此我需要在原有的`sendFetchReq`基础上新增一个callback参数，把`receivedLength, contentLength`传给React组件。将上述代码那两行注释取消掉即可。
+
+```js
+export async function sendFetchReq(
+  url,
+  callback = (receivedLength, contentLength) => { },
+  options = { referer: '', rangeStart: 0 }
+);
+```
+
+前端用antd的progress组件即可。
+
+```jsx
+  // TODO: 进度条数据滞后。原因不明
+  function updateM4sDownloadProcess(receivedLength, contentLength) {
+    if (contentLength <= 0) return;
+    const newProgress = Math.round((receivedLength / contentLength) * 1000) / 10; // 保留1位小数
+    setM4sDownloadProgress(newProgress);
+  }
+
+    const { base64Str, blob } = await downloadM4s(url, updateM4sDownloadProcess);
+    finally {
+      setIsDownloading(false);
+      updateM4sDownloadProcess(0, 1); // 规避再次下载时，进度条从后往前运动的滑稽问题
+    }
+
+const progressColors = {
+  '0%': '#108ee9',
+  '100%': '#87d068',
+};
+                  <Progress
+                    percent={m4sDownloadProgress}
+                    strokeColor={progressColors}
+                  />
+```
+
+但遇到一个我无法解决的问题：TODO: 进度条长度相比于百分比数据是滞后的。
+
+### 常规7：允许用户手动抓包后，添加URL到URL列表
+
+主要是实现一个表单，放在一个新弹窗里。我们把这个新弹窗放在一个新的组件里，[src/headerSub/M4sUrlAddForm.jsx](https://github.com/Hans774882968/bili-m4s-fetch-demo/blob/main/src/headerSub/M4sUrlAddForm.jsx)。弹窗的UI代码很常规，只有一个点值得说说：为了实现提交后隐藏弹窗，我们需要一个回调函数，供`M4sUrlAddForm`在`onFinish`中调用。
+
+```js
+  const addToM4sUrlList = (newUrlDesc) => {
+    setUrls((prevUrls) => [newUrlDesc, ...prevUrls]); // 新增的URL在最显眼的位置
+    messageApi.success('成功添加到URL列表');
+    setIsM4sFormDlgOpen(false);
+  };
+```
+
+### 难点7：打包优化
+
+查看打包情况：`yarn add -D rollup-plugin-visualizer`，然后`vite.config.js`：
+
+```js
+plugins: [
+  visualizer()
+],
+```
+
+不做任何配置的情况下执行`yarn build`，就能在打包完毕后生成stats.html。我看到，Babel是最大的，占我打包产物体积的40%了。但是拆分chunk后，实测`content.js`不能直接import，需要用创建script标签的方式，才能拿到代码。TODO: 有点麻烦，我先不做了。
 
 ## 参考资料
 
 1. https://blog.haoji.me/chrome-plugin-develop.html
 2. https://developer.chrome.com/docs/extensions/reference/api/runtime?hl=zh-cn
 3. 将消息从`background.js`传递到`popup.js`：https://stackoverflow.com/questions/12265403/passing-message-from-background-js-to-popup-js
+4. fetch API获取下载进度：https://tutorial.javascript.ac.cn/web-apis/fetch-tracking-download-progress/

@@ -12,11 +12,15 @@ export function blobToDataURI(blob) {
   });
 }
 
-export function sendFetchReq(url, options = { referer: '', rangeStart: 0 }) {
+export async function sendFetchReq(
+  url,
+  callback = (receivedLength, contentLength) => { },
+  options = { referer: '', rangeStart: 0 }
+) {
   const { referer } = options;
   let { rangeStart } = options;
   rangeStart = typeof rangeStart === 'number' ? rangeStart : 0;
-  return fetch(url, {
+  const resp = await fetch(url, {
     headers: {
       'accept': '*/*',
       'accept-language': 'zh-CN,zh;q=0.9',
@@ -34,12 +38,31 @@ export function sendFetchReq(url, options = { referer: '', rangeStart: 0 }) {
     method: 'GET',
     mode: 'cors',
     credentials: 'omit'
-  }).then(res => res.blob());
+  });
+  const reader = resp.body.getReader();
+  const contentLength = Number(resp.headers.get('content-length')) || 0;
+  callback(0, contentLength);
+  let receivedLength = 0;
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    receivedLength += value.length;
+    callback(receivedLength, contentLength);
+  }
+  return new Blob(chunks);
 }
 
-export async function downloadM4s(url, options = { referer: '' }) {
+export async function downloadM4s(
+  url,
+  callback = (receivedLength, contentLength) => { },
+  options = { referer: '' }
+) {
   const { referer } = options;
-  const blob = await sendFetchReq(url, { referer, rangeStart: 0 });
+  const blob = await sendFetchReq(url, callback, { referer, rangeStart: 0 });
   const dataURI = await blobToDataURI(blob);
   // data:application/octet-stream;base64,
   const rawBase64Str = String(dataURI);

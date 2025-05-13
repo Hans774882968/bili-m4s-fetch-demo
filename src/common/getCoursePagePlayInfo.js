@@ -13,7 +13,15 @@ export function getWebSeasonApiUrl({ epId, seasonId }) {
 
 export async function getWebSeasonInfo(epOrSeason) {
   const webSeasonApiUrl = getWebSeasonApiUrl(epOrSeason);
-  const resp = await fetch(webSeasonApiUrl);
+  let resp = null;
+  try {
+    resp = await fetch(webSeasonApiUrl);
+  } catch (err) {
+    return {
+      err: new Error(`fetch ${webSeasonApiUrl}:: ${err.message || ''}`),
+      webSeasonInfo: {}
+    };
+  }
   if (!resp.ok) {
     return {
       err: new Error(`fetch ${webSeasonApiUrl}:: ${resp.statusText}`),
@@ -78,7 +86,15 @@ export async function getCoursePagePlayInfoFromApi() {
     };
   }
   const playurlApiUrl = getPlayurlApiUrl(avid, cid, seasonIdPlayUrlUse, epIdPlayUrlUse);
-  const resp = await fetch(playurlApiUrl);
+  let resp = null;
+  try {
+    resp = await fetch(playurlApiUrl);
+  } catch (err) {
+    return {
+      err: new Error(`fetch ${playurlApiUrl}:: ${err.message || ''}`),
+      playInfo: {}
+    };
+  }
   if (!resp.ok) {
     return {
       err: new Error(`fetch ${playurlApiUrl}:: ${resp.statusText}`),

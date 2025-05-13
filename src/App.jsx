@@ -1,24 +1,42 @@
 import { useState } from 'react';
 import './App.scss';
-import { Alert, Button, Layout, List, message, Modal, Tag, Tooltip } from 'antd';
+import {
+  Alert,
+  Button,
+  Layout,
+  List,
+  message,
+  Modal,
+  Progress,
+  Tag,
+  Tooltip
+} from 'antd';
 import {
   ArrowsAltOutlined,
   CopyOutlined,
   DashboardTwoTone,
   DownloadOutlined,
+  PlusCircleTwoTone,
   QuestionCircleTwoTone,
   ReloadOutlined
 } from '@ant-design/icons';
 import { downloadM4s } from './common/request';
-import { formatFileSize, getM4sFileName } from './common/utils';
+import { formatFileSize, getM4sFileName } from './utils/utils';
 import HansClamp from './clamp-js/HansClamp';
 import { getNewUrlsFromFetchApi } from './common/getUrlsFromBiliBili';
 import { downloadFileByALink } from './common/downloadFile';
 import Copyright from './contentSub/Copyright';
 import Dashboard from './headerSub/Dashboard';
 import { isInCoursePage } from './utils/coursePage';
+import M4sUrlAddForm from './headerSub/M4sUrlAddForm';
+import useDocumentTitle from './hooks/useDocumentTitle';
 
 const { Header, Content, Footer } = Layout;
+
+const progressColors = {
+  '0%': '#108ee9',
+  '100%': '#87d068',
+};
 
 function getFileSizeText(fileSize) {
   const strSize = formatFileSize(fileSize);
@@ -27,6 +45,7 @@ function getFileSizeText(fileSize) {
 
 const App = ({ initialUrls, initialDashboardData }) => {
   const [messageApi, contextHolder] = message.useMessage();
+  const documentTitle = useDocumentTitle();
 
   const [urls, setUrls] = useState(initialUrls);
   const [base64Result, setBase64Result] = useState('');
@@ -40,22 +59,33 @@ const App = ({ initialUrls, initialDashboardData }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const copyBtnDisabled = base64Result === '';
 
+  const [m4sDownloadProgress, setM4sDownloadProgress] = useState(0);
+
   const [m4sFileName, setM4sFileName] = useState('');
+  const m4sDownloadSuccessInfoText = `${m4sFileName}${blobSizeText}`;
+
+  // TODO: 进度条数据滞后。原因不明
+  function updateM4sDownloadProcess(receivedLength, contentLength) {
+    if (contentLength <= 0) return;
+    const newProgress = Math.round((receivedLength / contentLength) * 1000) / 10;
+    setM4sDownloadProgress(newProgress);
+  }
 
   const handleDownload = async (m4sUrlDesc) => {
     const { url } = m4sUrlDesc;
     try {
       setIsDownloading(true);
-      const { base64Str, blob } = await downloadM4s(url);
+      const { base64Str, blob } = await downloadM4s(url, updateM4sDownloadProcess);
       setBase64Result(base64Str);
       setBlobResult(blob);
-      setM4sFileName(getM4sFileName(m4sUrlDesc));
+      setM4sFileName(getM4sFileName(m4sUrlDesc, documentTitle));
       messageApi.success('下载完成');
     } catch (error) {
-      console.error('Error fetching URL:', error);
-      messageApi.error('下载出错');
+      console.error(`Error fetching ${url}`, error);
+      messageApi.error('下载出错！详见控制台');
     } finally {
       setIsDownloading(false);
+      updateM4sDownloadProcess(0, 1);
     }
   };
 
@@ -84,6 +114,20 @@ const App = ({ initialUrls, initialDashboardData }) => {
   };
   const handleDashboardDlgClose = () => {
     setIsDashboardDlgOpen(false);
+  };
+
+  const [isM4sFormDlgOpen, setIsM4sFormDlgOpen] = useState(false);
+  const openM4sFormDialog = () => {
+    setIsM4sFormDlgOpen(true);
+  };
+  const handleM4sFormDlgClose = () => {
+    setIsM4sFormDlgOpen(false);
+  };
+
+  const addToM4sUrlList = (newUrlDesc) => {
+    setUrls((prevUrls) => [newUrlDesc, ...prevUrls]);
+    messageApi.success('成功添加到URL列表');
+    setIsM4sFormDlgOpen(false);
   };
 
   const updateM4sUrls = async () => {
@@ -135,8 +179,17 @@ const App = ({ initialUrls, initialDashboardData }) => {
   const dashboardNode = (
     <Dashboard
       dashboardData={dashboardData}
+      documentTitle={documentTitle}
       isDashboardDlgOpen={isDashboardDlgOpen}
       handleDashboardDlgClose={handleDashboardDlgClose}
+    />
+  );
+
+  const m4sUrlAddFormNode = (
+    <M4sUrlAddForm
+      isM4sFormDlgOpen={isM4sFormDlgOpen}
+      handleM4sFormDlgClose={handleM4sFormDlgClose}
+      onAddUrl={addToM4sUrlList}
     />
   );
 
@@ -167,6 +220,11 @@ const App = ({ initialUrls, initialDashboardData }) => {
             title="仪表盘"
             onClick={openDashboardDialog}
           />
+          <PlusCircleTwoTone
+            style={{ fontSize: '16px' }}
+            title="手动添加URL"
+            onClick={openM4sFormDialog}
+          />
         </Header>
 
         <Content className="request-container">
@@ -189,6 +247,7 @@ const App = ({ initialUrls, initialDashboardData }) => {
                       title={
                         <div>
                           <Tag color="blue">{item.getTypeStr()}</Tag>
+                          <Tag color="blue">{item.getBackupUrlStr()}</Tag>
                           <span>quality: {item.quality}</span>
                         </div>
                       }
@@ -212,16 +271,31 @@ const App = ({ initialUrls, initialDashboardData }) => {
                 pagination={{
                   showTotal: (total) => `${total}条`,
                   showSizeChanger: true,
+                  defaultPageSize: 20,
                 }}
               />
             </Content>
           </Layout>
 
-          <Layout className="result-container">
+          <Layout className="process-and-result-container">
+            {
+              isDownloading && (
+                <Header className="sub-div-header">
+                  <Progress
+                    percent={m4sDownloadProgress}
+                    strokeColor={progressColors}
+                  />
+                </Header>
+              )
+            }
             {
               m4sFileName && (
-                <Header className="sub-div-header">
-                  <span>{m4sFileName}{blobSizeText}</span>
+                <div className="m4s-download-info-wrap">
+                  <HansClamp
+                    lines={3}
+                    text={m4sDownloadSuccessInfoText}
+                    title={m4sDownloadSuccessInfoText}
+                  />
                   <Button
                     type="primary"
                     icon={<DownloadOutlined />}
@@ -229,7 +303,7 @@ const App = ({ initialUrls, initialDashboardData }) => {
                   >
                     下载
                   </Button>
-                </Header>
+                </div>
               )
             }
             <Header className="sub-div-header">
@@ -264,6 +338,7 @@ const App = ({ initialUrls, initialDashboardData }) => {
       {contextHolder}
       {expandDialogBtn}
       {dashboardNode}
+      {m4sUrlAddFormNode}
       {dialogNode}
     </>
   );

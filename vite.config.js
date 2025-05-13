@@ -4,6 +4,7 @@ import copy from 'rollup-plugin-copy';
 import path from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { playInfoMockPlugin } from './src/vite-custom-plugins/playInfoMockPlugin';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 const destName = 'dist';
 
@@ -27,9 +28,10 @@ export default defineConfig(({ mode }) => {
         hook: 'writeBundle',
       }),
       nodePolyfills({
-        include: ['process'],
+        include: ['process', 'path'],
       }),
-      playInfoMockPlugin()
+      playInfoMockPlugin(),
+      visualizer()
     ],
     build: {
       rollupOptions: {

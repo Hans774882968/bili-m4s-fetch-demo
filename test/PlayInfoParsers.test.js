@@ -190,17 +190,17 @@ describe('VideoDetailPlayInfoParser', () => {
 });
 
 describe('BangumiPlayInfoParser', () => {
-  it('should identify VIP play info when result.video_info.dash.video is not an array', () => {
-    const parser1 = new BangumiPlayInfoParser({ result: { video_info: { dash: { video: null } } } });
-    const parser2 = new BangumiPlayInfoParser({ result: { video_info: { dash: { video: [] } } } });
+  it('should identify VIP play info when data.video_info.dash.video is not an array', () => {
+    const parser1 = new BangumiPlayInfoParser({ data: { video_info: { dash: { video: null } } } });
+    const parser2 = new BangumiPlayInfoParser({ data: { video_info: { dash: { video: [] } } } });
 
     expect(parser1.isVipPlayInfo()).toBe(true);
     expect(parser2.isVipPlayInfo()).toBe(false);
   });
 
-  it('should parse VIP mp4 from result.video_info.durls', () => {
+  it('should parse VIP mp4 from data.video_info.durls', () => {
     const playInfo = {
-      result: {
+      data: {
         video_info: {
           durls: [
             { quality: 1080, durl: [{ url: 'http://example.com/vip.mp4' }] }
@@ -215,9 +215,9 @@ describe('BangumiPlayInfoParser', () => {
     expect(result[0].url).toBe('http://example.com/vip.mp4');
   });
 
-  it('should parse ordinary video from result.video_info.dash.video', () => {
+  it('should parse ordinary video from data.video_info.dash.video', () => {
     const playInfo = {
-      result: {
+      data: {
         video_info: {
           dash: {
             video: [

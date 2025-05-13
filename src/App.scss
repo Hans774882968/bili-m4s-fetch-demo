@@ -23,7 +23,7 @@
     @extend %box-border;
 
     .url-list,
-    .result-container {
+    .process-and-result-container {
       /* flex: 1; 无法解决溢出问题，宽度写死可解决 */
       width: 50%;
       @extend %box-border;
@@ -49,14 +49,23 @@
       }
     }
 
-    .sub-div-header {
+    %header-like-common-styles {
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-weight: bold;
       background-color: white;
-      padding: 0 16px;
       border-bottom: 1px solid #eee;
+    }
+
+    .m4s-download-info-wrap {
+      @extend %header-like-common-styles;
+      padding: 16px;
+    }
+
+    .sub-div-header {
+      @extend %header-like-common-styles;
+      padding: 0 16px;
     }
 
     .sub-div-content {
@@ -64,7 +73,7 @@
       padding: 0 16px;
     }
 
-    .result-container {
+    .process-and-result-container {
       .result-content {
         padding: 16px;
       }

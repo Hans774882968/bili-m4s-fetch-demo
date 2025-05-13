@@ -28,7 +28,15 @@ function parseScriptTags(scriptTags) {
 // 在同一个url请求，会得到301，但无伤大雅
 export async function getNewPlayInfoFromHtml() {
   const htmlUrl = window.location.href;
-  const resp = await fetch(htmlUrl);
+  let resp = null;
+  try {
+    resp = await fetch(htmlUrl);
+  } catch (err) {
+    return {
+      err: new Error(`fetch ${htmlUrl}:: ${err.message || ''}`),
+      playInfo: {}
+    };
+  }
   if (!resp.ok) {
     return {
       err: new Error(`fetch ${htmlUrl}:: ${resp.statusText}`),
@@ -56,6 +64,10 @@ export function getPlayInfoFromScriptTag() {
   return parseScriptTags(scriptTags);
 }
 
+/**
+ * TODO: 很难修的开发环境BUG：开发环境只会走 else 分支，导致 case3.js 的情况拿不到数据。
+ * 这是因为开发环境没法配套给出匹配的 URL 和 case3.js 。代码在生产环境没问题。
+*/
 export function videoDetailAndBangumiParsePlayInfo(playInfo) {
   let urlsObj = new ParseRet([], []);
   if (isInBangumiPage()) {
